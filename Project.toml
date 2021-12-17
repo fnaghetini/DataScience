@@ -1,6 +1,7 @@
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 CSV = "336ed68f-0bac-5ca0-87d4-7b16caf5d00b"
+CUDA = "052768ef-5323-5732-b1bb-66c8b64840ba"
 Clustering = "aaaa29a8-35af-508c-8bc3-b662a17a0fe5"
 ColorSchemes = "35d6a980-a343-548e-a6ea-1d62b119f2f4"
 Convex = "f65535da-76fb-5f13-bab9-19810c17039a"
