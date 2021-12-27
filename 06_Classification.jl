@@ -394,7 +394,7 @@ The **Nearest Neighbour Search** algorithm aims to find the point in the tree th
 
 **Note:** check [here](https://en.wikipedia.org/wiki/K-d_tree) for more math details.
 
-We are going to use the [NearestNeighbors.jl](https://github.com/KristofferC/NearestNeighbors.jl) package. First, let's build the KD tree...
+We are going to use the [NearestNeighbors.jl](https://github.com/KristofferC/NearestNeighbors.jl) package. This is not straight forward, since we need to do some preprocessing first. Thus, let's build the KD tree. 
 
 **Note:** we need to transpose `X` matrix in order to use NearestNeighbors.jl package.
 """
@@ -402,6 +402,113 @@ We are going to use the [NearestNeighbors.jl](https://github.com/KristofferC/Nea
 # ╔═╡ f81dfbd1-b018-4098-a484-2619215abace
 # building KD tree
 kdtree = KDTree(X[train_idxs,:]')
+
+# ╔═╡ 14c7f4ba-1e06-4fe5-9fb5-b0e9bbf4793d
+md"""
+Now, we will use the `knn` function, which performs a lookup of the `k` nearest neigbours to the `points` from the data in the `tree`. If `sortres = true`, the result is sorted such that the results are in the order of increasing distance to the point. It returns both `indices` and `distances` of the training data.
+"""
+
+# ╔═╡ 0dd179a1-d48d-42d2-85c6-62ba48af0ccb
+# getting indices and distances
+knn_idxs, knn_dists = knn(kdtree, X[test_idxs,:]', 5, true);
+
+# ╔═╡ 588afb06-4f7b-458f-8037-6ef53b96b60b
+# indices
+knn_idxs
+
+# ╔═╡ ff2fcea0-3588-4a79-9906-f3effa148e86
+md"""
+**Note:** this is a nested `Array`, where each element is an 1D `Array` with the **indexes** of the 5 nearest points. Each element represents a test observation.
+"""
+
+# ╔═╡ 75d5de77-08db-4bdd-b418-fe9fa9e6353d
+# distances
+knn_dists
+
+# ╔═╡ 4644848e-c9ae-4742-9ce3-4747a85b1fd2
+md"""
+**Note:** this is also a nested `Array`, where each element is an 1D `Array` with the **distances** of the 5 nearest points. Each element represents a test observation. Each element is in ascending distance order.
+"""
+
+# ╔═╡ fa554c22-2156-43a6-8014-cbd98914f27d
+# 5 nearest train observation labels to each test observation
+nn_y_train = y[train_idxs][hcat(knn_idxs...)]
+
+# ╔═╡ be1405be-750e-4a74-895a-ed56beb0cd36
+# counting the number of labels per test observation
+nn_possible_labels = map(i -> counter(nn_y_train[:, i]), 1:size(nn_y_train, 2))
+
+# ╔═╡ 45625714-3ff0-4b46-8087-14ecbe672d08
+md"""
+Now, we can predict labels for testing data. Thus, we need to select the most frequent label per each test observation.
+"""
+
+# ╔═╡ ed93cb77-9eee-491a-835c-2952bd612946
+# selecting the most frequent label per each test observation
+nn_ŷ = map(i -> parse(Int,
+					  string(string(argmax(nn_possible_labels[i])))),
+		   1:size(nn_y_train, 2))
+
+# ╔═╡ ec8854ea-542a-4e15-8533-ec6225cafa72
+md"""
+Finally, we can compute Nearest Neighbour accuracy using the `findaccuracy` function...
+"""
+
+# ╔═╡ 1ee8b7ec-3542-40ae-945c-3bf489266985
+nn_acc = findaccuracy(nn_ŷ, y[test_idxs])
+
+# ╔═╡ 112a337f-11ab-4074-88bd-17a887562d43
+md"""
+### Support Vector Machine
+
+**Support Vector Machines (SVM)** are supervised learning models with associated learning algorithms that analyze data for classification and regression analysis.
+
+Given a set of training examples, each marked as belonging to one of two categories, an SVM training algorithm builds a model that assigns new examples to one category or the other, making it a non-probabilistic binary linear classifier. SVM maps training examples to points in space so as to maximise the width of the gap between the two categories. New examples are then mapped into that same space and predicted to belong to a category based on which side of the gap they fall.
+
+**Note:** check [here](https://en.wikipedia.org/wiki/Support-vector_machine) for more math details.
+
+Here, we will use the [LIBSVM.jl](https://github.com/JuliaML/LIBSVM.jl) package. We need to transpose `X` matrix in order to use this package.
+"""
+
+# ╔═╡ 428463aa-0cc7-4008-95c7-8d1b5a28f2de
+# training SVM model
+svm_f̂ = svmtrain(X[train_idxs,:]', y[train_idxs])
+
+# ╔═╡ fb93f2ce-36d2-48f0-bafd-5ca18afadfd7
+md"""
+Now, we can predict labels for testing data. At the same time, we will also get an `Array` with decision values...
+"""
+
+# ╔═╡ f5bb8271-4239-4c4e-956d-9714a38d2c25
+svm_ŷ, decision_values = svmpredict(svm_f̂, X[test_idxs,:]');
+
+# ╔═╡ 4a3d2073-f465-4fe2-9c4d-4ceb810a2285
+# SVM predictions
+svm_ŷ
+
+# ╔═╡ ead6066e-6257-4659-84a6-98ea79993ea7
+md"""
+Finally, we can compute Support Vector Machine accuracy using the `findaccuracy` function...
+"""
+
+# ╔═╡ 92c46bcc-b3fa-4704-85cf-74782b9e6bef
+svm_acc = findaccuracy(svm_ŷ, y[test_idxs])
+
+# ╔═╡ 0f44eabe-c806-4154-b54e-65f8c678ef47
+md"""
+## Comparing models
+
+Now, we can compare the accuracies of each model...
+"""
+
+# ╔═╡ e1fdde22-08ea-4ae4-82a6-b7adbb6e250a
+begin
+	models = ["Lasso", "Ridge", "Elastic Net", "DT", "RF", "NN", "SVM"]
+
+	accs = [lasso_acc, ridge_acc, enet_acc, dt_acc, rf_acc, nn_acc, svm_acc]
+
+	hcat(models, accs)
+end
 
 # ╔═╡ Cell order:
 # ╟─3247c742-65df-11ec-0eed-7d76c7786941
@@ -475,3 +582,24 @@ kdtree = KDTree(X[train_idxs,:]')
 # ╠═04d476ca-07cb-4138-bd1b-679c223d7faf
 # ╟─626d7979-0362-4a54-8f7d-1df787a68195
 # ╠═f81dfbd1-b018-4098-a484-2619215abace
+# ╟─14c7f4ba-1e06-4fe5-9fb5-b0e9bbf4793d
+# ╠═0dd179a1-d48d-42d2-85c6-62ba48af0ccb
+# ╠═588afb06-4f7b-458f-8037-6ef53b96b60b
+# ╟─ff2fcea0-3588-4a79-9906-f3effa148e86
+# ╠═75d5de77-08db-4bdd-b418-fe9fa9e6353d
+# ╟─4644848e-c9ae-4742-9ce3-4747a85b1fd2
+# ╠═fa554c22-2156-43a6-8014-cbd98914f27d
+# ╠═be1405be-750e-4a74-895a-ed56beb0cd36
+# ╟─45625714-3ff0-4b46-8087-14ecbe672d08
+# ╠═ed93cb77-9eee-491a-835c-2952bd612946
+# ╟─ec8854ea-542a-4e15-8533-ec6225cafa72
+# ╠═1ee8b7ec-3542-40ae-945c-3bf489266985
+# ╟─112a337f-11ab-4074-88bd-17a887562d43
+# ╠═428463aa-0cc7-4008-95c7-8d1b5a28f2de
+# ╟─fb93f2ce-36d2-48f0-bafd-5ca18afadfd7
+# ╠═f5bb8271-4239-4c4e-956d-9714a38d2c25
+# ╠═4a3d2073-f465-4fe2-9c4d-4ceb810a2285
+# ╟─ead6066e-6257-4659-84a6-98ea79993ea7
+# ╠═92c46bcc-b3fa-4704-85cf-74782b9e6bef
+# ╟─0f44eabe-c806-4154-b54e-65f8c678ef47
+# ╠═e1fdde22-08ea-4ae4-82a6-b7adbb6e250a
